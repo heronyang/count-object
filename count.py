@@ -20,7 +20,8 @@ import numpy as np
 
 INPUT_FILENAME = 'input.jpg'
 SENSITIVITY_THRESHOLD = 100
-NOISE_THRESHOLD = 1
+NOISE_THRESHOLD = 3
+CLOSE_BY_RANGE = 2
 
 
 def generate_blur_and_circled_image(name, image):
@@ -29,7 +30,8 @@ def generate_blur_and_circled_image(name, image):
     cnts = cv2.findContours(binary_image, cv2.RETR_LIST,
                             cv2.CHAIN_APPROX_SIMPLE)[-2]
     blur_image = cv2.medianBlur(binary_image, NOISE_THRESHOLD)
-    circled_image = count_and_circle_objects(name, blur_image)
+    count, circled_image = count_and_circle_objects(blur_image)
+    print('Found ' + str(count) + ' objects in ' + name + ' image.')
 
     # Saves images to disk.
     cv2.imwrite(name + ".jpg", image)
@@ -40,25 +42,34 @@ def generate_blur_and_circled_image(name, image):
     return blur_image, circled_image
 
 
-def count_and_circle_objects(name, image):
+def generate_overlap_image(image1, image2):
+    overlapped_image = cv2.bitwise_and(image1, image2)
+    cv2.imwrite("overlapped.jpg", overlapped_image)
+
+    count, overlapped_circled_image = count_and_circle_objects(
+        overlapped_image)
+    cv2.imwrite("overlapped_circled.jpg", overlapped_circled_image)
+    print('Found ' + str(count) + ' objects in overlapped image.')
+
+
+def count_and_circle_objects(image, color=(0, 0, 255), thickness=1):
     circled_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL,
                                    cv2.CHAIN_APPROX_NONE)
     # Circles the objects.
     for contour in contours:
-        cv2.drawContours(circled_image, [contour], 0, (0, 0, 255), 1)
-    print('Found ' + str(len(contours)) + ' objects in ' + name + '.')
+        cv2.drawContours(circled_image, [contour], 0, color, thickness)
 
-    return circled_image
+    return len(contours), circled_image
 
 
-def generate_overlap_image(image1, image2):
-    overlapped_image = cv2.bitwise_and(image1, image2)
-    cv2.imwrite("overlapped.jpg", overlapped_image)
-
-    overlapped_circled_image = count_and_circle_objects(
-        "overlapped", overlapped_image)
-    cv2.imwrite("overlapped_circled.jpg", overlapped_circled_image)
+def enlarge_objects(name, image):
+    _, circled_image = count_and_circle_objects(image,
+                                                color=(255, 255, 255),
+                                                thickness=3)
+    enlarged_image = cv2.cvtColor(circled_image, cv2.COLOR_RGB2GRAY)
+    cv2.imwrite("enlarged_" + name + ".jpg", enlarged_image)
+    return enlarged_image
 
 
 def main():
@@ -68,7 +79,9 @@ def main():
     blue_blur_image, _ = generate_blur_and_circled_image("blue", blue_image)
     red_blur_image, _ = generate_blur_and_circled_image("red", red_image)
 
-    generate_overlap_image(blue_blur_image, red_blur_image)
+    enlarged_blue_image = enlarge_objects("blue", blue_blur_image)
+
+    generate_overlap_image(enlarged_blue_image, red_blur_image)
 
 
 if __name__ == "__main__":
